@@ -350,15 +350,54 @@ if __name__ == "__main__":
                 print(f"[{self.now:.3f}] unknown event {event_id!r} -> {payload}")
 
     sim = SimpleSim()
-    cars = read_agents("/Users/danahammouri/Downloads/assignment3_starter/input/agents16.txt")
-    graph = read_graph("/Users/danahammouri/Downloads/assignment3_starter/input/grid16.txt")
-    for car in cars: 
-        path= graph.dijkstra_shortest_path(car.start, car.end)
-        rand = random.randint(0,20)
-        car.dij_path = path[0]
-        car.dij_cost = path[1]
-        sim.schedule_at(rand, "A" , car)
+    # cars = read_agents("input/agents16.txt")
+    # graph = read_graph("input/grid16.txt")
 
+    # for car in cars: 
+    #     path= graph.dijkstra_shortest_path(car.start, car.end)
+    #     rand = random.randint(0,20)
+    #     car.dij_path = path[0]
+    #     car.dij_cost = path[1]
+    #     sim.schedule_at(rand, "A" , car)
+    
+    sim.schedule_at(1,"A","c1")
+    sim.schedule_at(1,"A", "c2")
+    sim.schedule_at(1,"A", "c3")
+    sim.schedule_at(1,"D")
+    first = sim._pop_next()
+
+    if first: 
+        current_time, even_id, payload = first
+        sim.now = current_time
+
+        simult_events = [(even_id,payload)]
+
+        while sim._queue and sim._queue[0][0] == current_time:
+            _, _, next_id, next_payload, _ = heapq.heappop(sim._queue)
+            simult_events.append((next_id,next_payload))
+        print(simult_events)
+        for event_id, payload in simult_events:
+            sim.handle(event_id, payload)
+        # for id, pl in simult_events:
+            #if id = "D" pop the event
+            #if id = "A" check the next node for all cars 
+                #for all cars that have the same next node update k value for edge 
+    #Must pop all events that have the same time as the popped events
+    print(f"sim now: {sim.now}")
+    sim.run()
+    sim._pop_next()
+    print(f"sim now: {sim.now}")
+    
+
+
+    # sim.schedule_at(1.0, "say", "first at t=1.0") #how to add to schedule
+    # h = sim.schedule_at(2.0, "say", "second at t=2.0 (will be canceled)")
+    # sim.schedule_at(3.0, "say", "third at t=3.0")
+    # #sim.now = sim._pop_next()[0]  --> How to update the simulation clock
+    # print(sim.now)
+    # h.cancel() #option to cancel events -- feature 
+    # # schedule a stop event at t=2.2
+    # sim.schedule_at(10, "stop", None)
 
     # sim.schedule_at(1.0, "say", "first at t=1.0") #how to add to schedule
     # h = sim.schedule_at(2.0, "say", "second at t=2.0 (will be canceled)")
@@ -368,5 +407,4 @@ if __name__ == "__main__":
     # # schedule a stop event at t=2.2
     # sim.schedule_at(10, "stop", None)
 
-    sim.run()
     print("events processed:", sim.events_processed)
