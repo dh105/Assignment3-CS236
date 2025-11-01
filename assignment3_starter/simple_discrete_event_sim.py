@@ -2,13 +2,14 @@ from __future__ import annotations
 import heapq
 import itertools
 from typing import Any, Optional, Tuple
-
+import random
 """Dijkstra implementation (baseline) -- awaiting dataset"""
 
 class WeightedGraph: 
     def __init__(self):
         self.adjList_edges = {}
         self.cars_at_edges = {}
+    
     def addNode(self,node):
         if (node in self.adjList_edges):
             print('Node in list') 
@@ -183,12 +184,16 @@ class PriorityQueue:
 #keep track of the statistics in the Car object
 #at time t how many cars have used that edge 
 class Car:
-    def __init__(self, id, startNode, currentNode, endNode , path):
+    def __init__(self, id, startNode, currentNode, endNode , dij_path, dij_cost):
         self.id = id
         self.start = startNode
         self.current = currentNode
         self.end = endNode
-        self.path = path
+        self.dij_path = dij_path
+        self.dij_cost = dij_cost
+        self.sim_cost = 0
+    def __str__(self):
+        return f"Car(id={self.id}, start={self.start}, current={self.current}, end={self.end}, dij_path={self.dij_path}, dij_cost ={self.dij_cost}, sim_cost ={self.sim_cost})"
     
 def read_graph(fname):
     # Open the file
@@ -231,23 +236,12 @@ def read_agents(fname):
         # path[0] contains the start location (index between 0 and numVertices-1)
         # path[1] contains the destination location (index between 0 and numVertices-1)
         path = line.strip().split(",")
-
-        car = Car(id, int(path[0]), int(path[0]), int(path[1]), [])
+        car = Car(id, int(path[0]), None, int(path[1]), [], 0)
         agents.append(car)
         id = id + 1
     # Close the file safely after done reading
     file.close()
     return agents
-
-"""Skeleton for Baseline"""
-# def baseline_algorithm(agentfile, graphfile):
-#     graph = read_graph(graphfile)
-#     carList = read_agents(agentfile)
-#     for car in carList:
-#         car_path = dijkstra_shortest_path(car[0], car[1])
-#         car = car(id, car[0], car[1], car_path) #might throw error because id undefined
-
-#use sys, route each car based on event
 
 
 """
@@ -343,24 +337,29 @@ if __name__ == "__main__":
     class SimpleSim(Simulator):
         def handle(self, event_id: str, payload: Any) -> None:
             # simple switch-case implemented with if/elif
-            if event_id == "arrive":
+            if event_id == "A":
                 print(f"[{self.now:.3f}] {payload}")
-            elif event_id == "departure":
+            elif event_id == "D":
                 print(f"[{self.now:.3f}] departure")
                 # reschedule recurring heartbeat
                 self.schedule_at(self.now+ 1.0, "departure", payload)
-            elif event_id == "stop":
+            elif event_id == "E":
                 print(f"[{self.now:.3f}] stopping")
                 self.stop()
             else:
                 print(f"[{self.now:.3f}] unknown event {event_id!r} -> {payload}")
 
     sim = SimpleSim()
-    cars = read_agents("input/agents16.txt")
-    events = []
+    cars = read_agents("/Users/danahammouri/Downloads/assignment3_starter/input/agents16.txt")
+    graph = read_graph("/Users/danahammouri/Downloads/assignment3_starter/input/grid16.txt")
     for car in cars: 
+        path= graph.dijkstra_shortest_path(car.start, car.end)
+        rand = random.randint(0,20)
+        car.dij_path = path[0]
+        car.dij_cost = path[1]
+        sim.schedule_at(rand, "A" , car)
 
-    sim.schedule_at()
+
     # sim.schedule_at(1.0, "say", "first at t=1.0") #how to add to schedule
     # h = sim.schedule_at(2.0, "say", "second at t=2.0 (will be canceled)")
     # sim.schedule_at(3.0, "say", "third at t=3.0")
