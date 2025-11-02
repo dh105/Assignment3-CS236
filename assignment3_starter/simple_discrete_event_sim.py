@@ -361,7 +361,7 @@ if __name__ == "__main__":
     graph = read_graph("input/grid16.txt")
     k_at_t = {}
 
-    #sets the number of cars at every edge to zero in the begining
+    #sets the k (number of cars at every edge) to zero at beginning of simulation
     for node, value in graph.adjList_edges.items():
         for node2, weight in value: 
             k_at_t[(node,node2)] = 0
@@ -369,39 +369,47 @@ if __name__ == "__main__":
     
     #scheduled the arrival for every car
     for car in cars: 
-        path= graph.dijkstra_shortest_path(car.start, car.end)
-        rand = random.randint(0,20)
+        dij_result= graph.dijkstra_shortest_path(car.start, car.end) #Run dijkstra for each car
         car.arrival_time = 0
-        car.dij_path = path[0]
-        car.dij_cost = path[1]
+        car.dij_path = dij_result[0]
+        car.dij_cost = dij_result[1]
+        rand = random.randint(0,20) #Random number generator
         sim.schedule_at(rand, "A" , car)
     
     # sim.schedule_at(1,"A","c1")
     # sim.schedule_at(1,"A", "c2")
     # sim.schedule_at(1,"A", "c3")
     # sim.schedule_at(1,"D", "c4") 
-    #for every event on the queue 
-    while sim._queue:
-        first = sim._pop_next()
-        if first: 
-            current_time, even_id, payload = first
-            sim.now = current_time
-
-            simult_events = [(even_id,payload)]
-
-            #stores all simultaneous events
-            while sim._queue:
-                next_time = sim._queue[0][0]
-                if next_time == current_time:
-                    next_event = sim._pop_next()
-                    if next_event:
-                        _, next_id, next_payload = next_event
-                        simult_events.append((next_id, next_payload))
-                else:
-                    break
-            for event_id, payload in simult_events:
-                sim.handle(event_id, payload)
     
+    #for every event on the queue 
+    
+    # while sim._queue: #changed to for loop for testing purposeds
+    #     #print(sim._queue)
+    #     first = sim._pop_next() #Get first item in queue
+    #     print(first)
+    #     if first: #If not null
+    #         current_time = first[0]
+    #         event_id = first[2]
+    #         payload = first[3]
+    #         sim.now = current_time
+
+    #         simult_events = [(event_id,payload)] #track first item in simultaneous events 
+    #         #simult_events = [(current_time, event_id,payload)] #track first item in simultaneous events 
+
+    #         #stores all simultaneous events
+    #         while sim._queue: #iterating to other events in queue
+    #             print(f'this is supposed to be the next event{sim._queue}')
+    #             next_time = sim._queue[0][0]
+    #             if next_time == current_time:
+    #                 next_event = sim._pop_next()
+    #                 if next_event:
+    #                     _, next_id, next_payload = next_event
+    #                     simult_events.append((next_id, next_payload))
+    #             else:
+    #                 break
+    #         for event_id, payload in simult_events:
+    #             sim.handle(event_id, payload)
+
 
 
     print(f"Processing {len(simult_events)} events at time {current_time}")
