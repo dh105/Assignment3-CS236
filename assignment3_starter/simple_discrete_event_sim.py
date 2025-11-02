@@ -191,6 +191,10 @@ class Car:
         self.dij_path = dij_path
         self.dij_cost = dij_cost
         self.sim_cost = 0
+        self.path_with_times = []
+        self.arrival_time = 0
+        self.completion_time = 0
+        self.path_index = 0 
     def __str__(self):
         return f"Car(id={self.id}, start={self.start}, current={self.current}, end={self.end}, dij_path={self.dij_path}, dij_cost ={self.dij_cost}, sim_cost ={self.sim_cost})"
     
@@ -334,10 +338,14 @@ class Simulator:
 if __name__ == "__main__":
     # simple simpulator that extends the main simulator
     class SimpleSim(Simulator):
+        def __init__(self):
+            super().__init__()
+            self.edge_cost = {}
         def handle(self, event_id: str, payload: Any) -> None:
             # simple switch-case implemented with if/elif
             if event_id == "A":
                 print(f"[{self.now:.3f}] {payload}")
+
             elif event_id == "D":
                 print(f"[{self.now:.3f}] departure")
                 # reschedule recurring heartbeat
@@ -356,12 +364,14 @@ if __name__ == "__main__":
     #sets the number of cars at every edge to zero in the begining
     for node, value in graph.adjList_edges.items():
         for node2, weight in value: 
-            k_at_t[(node,node2)] = 1
-
+            k_at_t[(node,node2)] = 0
+            sim.edge_cost[(node,node2)] = weight
+    
     #scheduled the arrival for every car
     for car in cars: 
         path= graph.dijkstra_shortest_path(car.start, car.end)
         rand = random.randint(0,20)
+        car.arrival_time = 0
         car.dij_path = path[0]
         car.dij_cost = path[1]
         sim.schedule_at(rand, "A" , car)
@@ -373,7 +383,6 @@ if __name__ == "__main__":
     #for every event on the queue 
     while sim._queue:
         first = sim._pop_next()
-
         if first: 
             current_time, even_id, payload = first
             sim.now = current_time
@@ -381,14 +390,20 @@ if __name__ == "__main__":
             simult_events = [(even_id,payload)]
 
             #stores all simultaneous events
-            while sim._queue and sim._queue[0][0] == current_time:
-                _, _, next_id, next_payload, _ = heapq.heappop(sim._queue)
-                simult_events.append((next_id,next_payload))
-            print(simult_events)
+            while sim._queue:
+                next_time = sim._queue[0][0]
+                if next_time == current_time:
+                    next_event = sim._pop_next()
+                    if next_event:
+                        _, next_id, next_payload = next_event
+                        simult_events.append((next_id, next_payload))
+                else:
+                    break
             for event_id, payload in simult_events:
                 sim.handle(event_id, payload)
     
-    
+
+
     print(f"Processing {len(simult_events)} events at time {current_time}")
     print(f"Events: {simult_events}")    
         # for id, pl in simult_events:
