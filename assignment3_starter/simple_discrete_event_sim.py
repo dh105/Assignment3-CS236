@@ -8,7 +8,6 @@ import random
 class WeightedGraph: 
     def __init__(self):
         self.adjList_edges = {}
-        self.cars_at_edges = {}
     
     def addNode(self,node):
         if (node in self.adjList_edges):
@@ -350,38 +349,53 @@ if __name__ == "__main__":
                 print(f"[{self.now:.3f}] unknown event {event_id!r} -> {payload}")
 
     sim = SimpleSim()
-    # cars = read_agents("input/agents16.txt")
-    # graph = read_graph("input/grid16.txt")
+    cars = read_agents("input/agents16.txt")
+    graph = read_graph("input/grid16.txt")
+    k_at_t = {}
 
-    # for car in cars: 
-    #     path= graph.dijkstra_shortest_path(car.start, car.end)
-    #     rand = random.randint(0,20)
-    #     car.dij_path = path[0]
-    #     car.dij_cost = path[1]
-    #     sim.schedule_at(rand, "A" , car)
+    #sets the number of cars at every edge to zero in the begining
+    for node, value in graph.adjList_edges.items():
+        for node2, weight in value: 
+            k_at_t[(node,node2)] = 1
+
+    #scheduled the arrival for every car
+    for car in cars: 
+        path= graph.dijkstra_shortest_path(car.start, car.end)
+        rand = random.randint(0,20)
+        car.dij_path = path[0]
+        car.dij_cost = path[1]
+        sim.schedule_at(rand, "A" , car)
     
-    sim.schedule_at(1,"A","c1")
-    sim.schedule_at(1,"A", "c2")
-    sim.schedule_at(1,"A", "c3")
-    sim.schedule_at(1,"D")
-    first = sim._pop_next()
+    # sim.schedule_at(1,"A","c1")
+    # sim.schedule_at(1,"A", "c2")
+    # sim.schedule_at(1,"A", "c3")
+    # sim.schedule_at(1,"D", "c4") 
+    #for every event on the queue 
+    while sim._queue:
+        first = sim._pop_next()
 
-    if first: 
-        current_time, even_id, payload = first
-        sim.now = current_time
+        if first: 
+            current_time, even_id, payload = first
+            sim.now = current_time
 
-        simult_events = [(even_id,payload)]
+            simult_events = [(even_id,payload)]
 
-        while sim._queue and sim._queue[0][0] == current_time:
-            _, _, next_id, next_payload, _ = heapq.heappop(sim._queue)
-            simult_events.append((next_id,next_payload))
-        print(simult_events)
-        for event_id, payload in simult_events:
-            sim.handle(event_id, payload)
+            #stores all simultaneous events
+            while sim._queue and sim._queue[0][0] == current_time:
+                _, _, next_id, next_payload, _ = heapq.heappop(sim._queue)
+                simult_events.append((next_id,next_payload))
+            print(simult_events)
+            for event_id, payload in simult_events:
+                sim.handle(event_id, payload)
+    
+    
+    print(f"Processing {len(simult_events)} events at time {current_time}")
+    print(f"Events: {simult_events}")    
         # for id, pl in simult_events:
             #if id = "D" pop the event
             #if id = "A" check the next node for all cars 
                 #for all cars that have the same next node update k value for edge 
+
     #Must pop all events that have the same time as the popped events
     print(f"sim now: {sim.now}")
     sim.run()
