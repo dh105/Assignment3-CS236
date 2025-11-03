@@ -185,9 +185,9 @@ class PriorityQueue:
 class Car:
     def __init__(self, id, startNode, currentNode, endNode , dij_path, dij_cost):
         self.id = id
-        self.start = startNode
-        self.end = endNode
-        self.current = currentNode
+        #self.start_node = startNode
+        #self.end_node = endNode
+        #self.current = currentNode
         self.dij_path = dij_path
         self.dij_cost = dij_cost
         self.sim_cost = 0
@@ -341,23 +341,13 @@ if __name__ == "__main__":
         def __init__(self):
             super().__init__()
             self.graph = self.graph.adj #stores graph information at every step
-            self.edge_congestion = {} #edge: k(e,t) 
+            self.edge_congestion = {} #edge: (car_id, start_time, end_time)
             self.cars_state = {} #records where cars are at at each step of the sim
         def handle(self, event_id: str, payload: Any) -> None:
             # simple switch-case implemented with if/elif
             if event_id == "A":
                 print(f"[{self.now:.3f}] {payload}")
-                car_id = payload["id"]
-                start = payload["start"]
-                end = payload["end"]
-                dij_path=payload["dij_path"]
-                if dij_path == []: #if no path exists for car
-                    print(f"No path found for Car {car_id}")
-                    return
                 
-                self.cars_state[car_id] = {"path": dij_path, "position":0}
-                print(f"[{self.now:.3f}] Car {car_id} enters system, path = {dij_path}")
-                self.move_graph(car_id)
 
             elif event_id == "D":
                 print(f"[{self.now:.3f}] departure")
@@ -369,7 +359,20 @@ if __name__ == "__main__":
             else:
                 print(f"[{self.now:.3f}] unknown event {event_id!r} -> {payload}")
         
-        def move_through_graph(self, car_id):
+        def handle_arrival(self, payload):
+            car_id = payload["id"]
+            start = payload["start"]
+            end = payload["end"]
+            dij_path=payload["dij_path"]
+            if dij_path == []: #if no path exists for car
+                print(f"No path found for Car {car_id}")
+                return
+                
+            self.cars_state[car_id] = {"path": dij_path, "position":0}
+            print(f"[{self.now:.3f}] Car {car_id} enters system, path = {dij_path}")
+            self.move_next_edge(car_id)
+
+        def move_next_edge(self, car_id):
             state = self.cars_state[car_id]
             path = state["path"]
             curr = state["position"]
@@ -397,9 +400,27 @@ if __name__ == "__main__":
                 self.edge_congestion.append =([car_id,self.now,self.now + congestion_offset])
             print(f"Car {car_id} starts {u}, {v}: base weight = {base_weight}, k = {k} ,total congestion = {congestion_offset}")
 
+            #Schedule departure event to queue
             self.schedule_at(self.now + congestion_offset, "D", {"car_id": car_id, "edge": (u, v)})
+        
+        def handle_departure(self, payload):
+            car_id = payload["car_id"]
+            u, v = payload["edge"]
 
+            #Remove car from congestion at edge
+            edge = (u,v)
+            if edge in self.edge_congestion:
+                updated = []
+                for data in self.edge_congestion[edge]:
+                    if data[0] != car_id:
+                        updated.append(data)
+                self.edge_congestion[edge] = updated
             
+            self.cars_state[car_id]["position"] +=1 #car officially leaves next edge and traverses next node in path
+
+            print(f"[{self.now:.3f}] Car {car_id} leaves edge {u},{v} ")
+            self.move_next_edge(car_id) #Car continues on path on graph
+
 
     sim = SimpleSim()
     cars = read_agents("input/agents16.txt")
