@@ -10,10 +10,9 @@ class WeightedGraph:
         self.adjList_edges = {}
     
     def addNode(self,node):
-        if (node in self.adjList_edges):
-            print('Node in list') 
-        else:
+        if node not in self.adjList_edges:
             self.adjList_edges[node] = []
+
     def addEdge(self,node1, node2, weight):
         if (node1 not in self.adjList_edges or node2 not in self.adjList_edges):
             print("One of the nodes is not in the list")
@@ -183,20 +182,17 @@ class PriorityQueue:
 #keep track of the statistics in the Car object
 #at time t how many cars have used that edge 
 class Car:
-    def __init__(self, id, startNode, currentNode, endNode , dij_path, dij_cost):
-        self.id = id
-        #self.start_node = startNode
-        #self.end_node = endNode
-        #self.current = currentNode
+    def __init__(self, car_id, startNode, endNode , dij_path):
+        self.car_id = id
+        self.start_node = startNode
+        self.end_node = endNode
+        self.position = 0
         self.dij_path = dij_path
-        self.dij_cost = dij_cost
+        self.dij_cost = 0
         self.sim_cost = 0
-        self.path_with_times = []
-        self.arrival_time = 0
-        self.completion_time = 0
-        self.path_index = 0 
+        self.done = False
     def __str__(self):
-        return f"Car(id={self.id}, start={self.start}, current={self.current}, end={self.end}, dij_path={self.dij_path}, dij_cost ={self.dij_cost}, sim_cost ={self.sim_cost})"
+        return f"Car(id={self.id}, start={self.start_node}, position={self.position}, end={self.end_node}, dij_path={self.dij_path}, dij_cost ={self.dij_cost}, sim_cost ={self.sim_cost})"
     
 def read_graph(fname):
     # Open the file
@@ -239,7 +235,7 @@ def read_agents(fname):
         # path[0] contains the start location (index between 0 and numVertices-1)
         # path[1] contains the destination location (index between 0 and numVertices-1)
         path = line.strip().split(",")
-        car = Car(id, int(path[0]), None, int(path[1]), [], 0)
+        car = Car(id, int(path[0]), int(path[1]), [])
         agents.append(car)
         id = id + 1
     # Close the file safely after done reading
@@ -340,64 +336,64 @@ if __name__ == "__main__":
     class SimpleSim(Simulator):
         def __init__(self):
             super().__init__()
-            self.graph = self.graph.adj #stores graph information at every step
-            self.edge_congestion = {} #edge: (car_id, start_time, end_time)
-            self.cars_state = {} #records where cars are at at each step of the sim
+            self.graph = WeightedGraph()
+            self.cars = {}
+            self.edge_congestion = {} #{edge: (car_id, start_time, end_time)}
+
         def handle(self, event_id: str, payload: Any) -> None:
             # simple switch-case implemented with if/elif
-            if event_id == "A":
-                print(f"[{self.now:.3f}] {payload}")
-                
-
-            elif event_id == "D":
-                print(f"[{self.now:.3f}] departure")
-                # reschedule recurring heartbeat
-                self.schedule_at(self.now+ 1.0, "departure", payload)
-            elif event_id == "E":
+            if event_id == "arrival": #Car arrives to new edge, begins travel
+                self.handle_arrival(payload)
+            elif event_id == "departure": #Car leaves current edge, moves to next edge
+                self.handle_departure(payload)
+            # elif event_id == "car_done":
+            #     print(f"[{self.now:.3f}] Car {payload["id"]} routing finished")
+            elif event_id == "stop":
                 print(f"[{self.now:.3f}] stopping")
                 self.stop()
             else:
                 print(f"[{self.now:.3f}] unknown event {event_id!r} -> {payload}")
         
         def handle_arrival(self, payload):
-            car_id = payload["id"]
-            start = payload["start"]
-            end = payload["end"]
-            dij_path=payload["dij_path"]
-            if dij_path == []: #if no path exists for car
-                print(f"No path found for Car {car_id}")
+            car_id = payload["car_id"]
+            car = self.cars[car_id]
+         
+            if car.position >= len(car.dij_path) -1:
+                car.done = True
+                print(f"[{self.now:.3f}] Car {car_id} reached destination")
                 return
-                
-            self.cars_state[car_id] = {"path": dij_path, "position":0}
-            print(f"[{self.now:.3f}] Car {car_id} enters system, path = {dij_path}")
-            self.move_next_edge(car_id)
+        
+            self.move_next_edge(car.car_id)
 
         def move_next_edge(self, car_id):
-            state = self.cars_state[car_id]
-            path = state["path"]
-            curr = state["position"]
+            u = car.dij_path[car.position]
+            v = car.dij_path[car.position+1]
+            edge = (u,v)
 
-            if curr>= len(path) -1: #if curr has finished iterating through
-                self.schedule_at(self.now, "car_done", {"car_id":car_id})
+            
+
+        #Lookup baseweight on Graph object
+            base_weight = None
+            for neighbor, weight in self.graph.getNeighbors(u):
+                if neighbor == v:
+                    base_weight = WeightedGraph
+                    break
+            if base_weight is None:
+                print(f"Error: No edge from {u} to {v}")
                 return
 
-            u = path[i]
-            v=path[i+1]
-            base_weight = self.graph[u][v]
 
-            k=0 
-            edge = (u,v)
-            if edge in self.edge_congestion:
-                for traffic in self.edge_congestion[edge]:
-                    car, start, end = traffic
-                    if start<=self.now<end: #if the car is currently using the edge
+            k=0 #number of cars on edge
+            if edge in self.edge_congestion: #more than 1 car on edge
+                for _,start_time, end_time in self.edge_congestion[edge]:
+                    if start_time<=self.now<end_time: #if the car is currently using the edge
                         k+=1
             congestion_offset = k*base_weight
-            global_cost += congestion_offset
+            #global_cost += congestion_offset
 
-            if edge not in self.edge_congestion:
+            if edge not in self.edge_congestion: #first car using edge
                 self.edge_congestion[edge] =[]
-                self.edge_congestion.append =([car_id,self.now,self.now + congestion_offset])
+                self.edge_congestion.append =([car_id,self.now,self.now + congestion_offset]) #Record the car id, start time, and end time using edge
             print(f"Car {car_id} starts {u}, {v}: base weight = {base_weight}, k = {k} ,total congestion = {congestion_offset}")
 
             #Schedule departure event to queue
@@ -405,10 +401,14 @@ if __name__ == "__main__":
         
         def handle_departure(self, payload):
             car_id = payload["car_id"]
-            u, v = payload["edge"]
+            car = self.cars[car_id]
+            u = car.dij_path[car.position]
+            v = car.dij_path[car.position+1]
+            car.position +=1 #car officially leaves next edge and traverses next node in path
+            edge = (u,v)
 
             #Remove car from congestion at edge
-            edge = (u,v)
+
             if edge in self.edge_congestion:
                 updated = []
                 for data in self.edge_congestion[edge]:
@@ -416,73 +416,31 @@ if __name__ == "__main__":
                         updated.append(data)
                 self.edge_congestion[edge] = updated
             
-            self.cars_state[car_id]["position"] +=1 #car officially leaves next edge and traverses next node in path
-
             print(f"[{self.now:.3f}] Car {car_id} leaves edge {u},{v} ")
             self.move_next_edge(car_id) #Car continues on path on graph
 
 
+# ------- Start Simulator ----------
     sim = SimpleSim()
-    cars = read_agents("input/agents16.txt")
-    graph = read_graph("input/grid16.txt")
-    k_at_t = {}
+    car_list = read_agents("input/agents16.txt")  # returns list
+    sim.cars = {car.car_id: car for car in car_list}  # convert to dict
+    print("Cars loaded:", sim.cars.keys())
+    graph_file = read_graph("input/grid16.txt")
 
-    #sets the k (number of cars at every edge) to zero at beginning of simulation
-    for node, value in graph.adjList_edges.items():
-        for node2, weight in value: 
-            k_at_t[(node,node2)] = 0
-            sim.edge_cost[(node,node2)] = weight
-    
     #scheduled the arrival for every car
-    for car in cars: 
-        dij_result= graph.dijkstra_shortest_path(car.start, car.end) #Run dijkstra for each car
-        car.arrival_time = 0
+    for car in sim.cars.values(): 
+        #Run Dijkstra for each car
+        dij_result= graph_file.dijkstra_shortest_path(car.start_node, car.end_node)
         car.dij_path = dij_result[0]
         car.dij_cost = dij_result[1]
-        rand = random.randint(0,20) #Random number generator
-        sim.schedule_at(rand, "A" , car)
-    
-    # sim.schedule_at(1,"A","c1")
-    # sim.schedule_at(1,"A", "c2")
-    # sim.schedule_at(1,"A", "c3")
-    # sim.schedule_at(1,"D", "c4") 
-    
-    #for every event on the queue 
-    for i in len(sim._queue):
-        #logic for general 
-        if sim._queue[i]:
-            
-    # while sim._queue: #changed to for loop for testing purposeds
-    #     #print(sim._queue)
-    #     first = sim._pop_next() #Get first item in queue
-    #     print(first)
-    #     if first: #If not null
-    #         current_time = first[0]
-    #         event_id = first[2]
-    #         payload = first[3]
-    #         sim.now = current_time
 
-    #         simult_events = [(event_id,payload)] #track first item in simultaneous events 
-    #         #simult_events = [(current_time, event_id,payload)] #track first item in simultaneous events 
-
-    #         #stores all simultaneous events
-    #         while sim._queue: #iterating to other events in queue
-    #             print(f'this is supposed to be the next event{sim._queue}')
-    #             next_time = sim._queue[0][0]
-    #             if next_time == current_time:
-    #                 next_event = sim._pop_next()
-    #                 if next_event:
-    #                     _, next_id, next_payload = next_event
-    #                     simult_events.append((next_id, next_payload))
-    #             else:
-    #                 break
-    #         for event_id, payload in simult_events:
-    #             sim.handle(event_id, payload)
+        rand_time = random.randint(0,20) #Random number generator
+        sim.schedule_at(rand_time, "arrival", {"car_id": car.car_id})
+        print(f"Scheduled car {car.car_id} at t={rand_time}, path cost: {car.dij_cost}")
 
 
-
-    print(f"Processing {len(simult_events)} events at time {current_time}")
-    print(f"Events: {simult_events}")    
+    # print(f"Processing {len(simult_events)} events at time {current_time}")
+    # print(f"Events: {simult_events}")    
         # for id, pl in simult_events:
             #if id = "D" pop the event
             #if id = "A" check the next node for all cars 
