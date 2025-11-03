@@ -186,8 +186,8 @@ class Car:
     def __init__(self, id, startNode, currentNode, endNode , dij_path, dij_cost):
         self.id = id
         self.start = startNode
-        self.current = currentNode
         self.end = endNode
+        self.current = currentNode
         self.dij_path = dij_path
         self.dij_cost = dij_cost
         self.sim_cost = 0
@@ -340,11 +340,24 @@ if __name__ == "__main__":
     class SimpleSim(Simulator):
         def __init__(self):
             super().__init__()
-            self.edge_cost = {}
+            self.graph = self.graph.adj #stores graph information at every step
+            self.edge_congestion = {} #edge: k(e,t) 
+            self.cars_state = {} #records where cars are at at each step of the sim
         def handle(self, event_id: str, payload: Any) -> None:
             # simple switch-case implemented with if/elif
             if event_id == "A":
                 print(f"[{self.now:.3f}] {payload}")
+                car_id = payload["id"]
+                start = payload["start"]
+                end = payload["end"]
+                dij_path=payload["dij_path"]
+                if dij_path == []: #if no path exists for car
+                    print(f"No path found for Car {car_id}")
+                    return
+                
+                self.cars_state[car_id] = {"path": dij_path, "position":0}
+                print(f"[{self.now:.3f}] Car {car_id} enters system, path = {dij_path}")
+                self.move_graph(car_id)
 
             elif event_id == "D":
                 print(f"[{self.now:.3f}] departure")
@@ -355,6 +368,38 @@ if __name__ == "__main__":
                 self.stop()
             else:
                 print(f"[{self.now:.3f}] unknown event {event_id!r} -> {payload}")
+        
+        def move_through_graph(self, car_id):
+            state = self.cars_state[car_id]
+            path = state["path"]
+            curr = state["position"]
+
+            if curr>= len(path) -1: #if curr has finished iterating through
+                self.schedule_at(self.now, "car_done", {"car_id":car_id})
+                return
+
+            u = path[i]
+            v=path[i+1]
+            base_weight = self.graph[u][v]
+
+            k=0 
+            edge = (u,v)
+            if edge in self.edge_congestion:
+                for traffic in self.edge_congestion[edge]:
+                    car, start, end = traffic
+                    if start<=self.now<end: #if the car is currently using the edge
+                        k+=1
+            congestion_offset = k*base_weight
+            global_cost += congestion_offset
+
+            if edge not in self.edge_congestion:
+                self.edge_congestion[edge] =[]
+                self.edge_congestion.append =([car_id,self.now,self.now + congestion_offset])
+            print(f"Car {car_id} starts {u}, {v}: base weight = {base_weight}, k = {k} ,total congestion = {congestion_offset}")
+
+            self.schedule_at(self.now + congestion_offset, "D", {"car_id": car_id, "edge": (u, v)})
+
+            
 
     sim = SimpleSim()
     cars = read_agents("input/agents16.txt")
@@ -382,7 +427,10 @@ if __name__ == "__main__":
     # sim.schedule_at(1,"D", "c4") 
     
     #for every event on the queue 
-    
+    for i in len(sim._queue):
+        #logic for general 
+        if sim._queue[i]:
+            
     # while sim._queue: #changed to for loop for testing purposeds
     #     #print(sim._queue)
     #     first = sim._pop_next() #Get first item in queue
